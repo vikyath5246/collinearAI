@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+venv/
+# Editors
+.vscode/
+.idea/
+# macOS
+.DS_Store
+# Docker
+*.log
