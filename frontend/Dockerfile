@@ -1,53 +1,48 @@
-# Stage 1: Dependencies
-FROM node:18-alpine AS deps
+FROM node:20-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
 WORKDIR /app
 
-# Copy package.json files
+# Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-
-# Install dependencies
 RUN npm ci --legacy-peer-deps
 
-# Stage 2: Builder
-FROM node:18-alpine AS builder
+# Rebuild the source code only when needed
+FROM base AS builder
 WORKDIR /app
-
-# Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Set environment variables
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Build the application
-ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
-# Stage 3: Runner
-FROM node:18-alpine AS runner
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
 
-# Create a non-root user to run the app
+# Create a non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-
-# Copy necessary files from builder
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
-# Set proper permissions
-RUN chown -R nextjs:nodejs /app
-
-# Switch to non-root user
 USER nextjs
 
-# Expose the port the app runs on
-EXPOSE 3000
+# Copy necessary files
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Environment variables must be redefined at runtime
+# Set environment variables
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
+
+# Expose the port
+EXPOSE 3000
 
 # Start the application
 CMD ["node", "server.js"]

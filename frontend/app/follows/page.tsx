@@ -1,16 +1,14 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/context/auth-context"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Search, Database, Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { StarOff, Star, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 type Dataset = {
   hf_id: string
@@ -21,36 +19,48 @@ type Dataset = {
   impact_score: number | null
 }
 
-export default function DatasetsPage() {
-  const [datasets, setDatasets] = useState<Dataset[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
+export default function FollowsPage() {
+  const [follows, setFollows] = useState<Dataset[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    const fetchDatasets = async () => {
+    // Redirect if not logged in
+    if (!user && !isLoading) {
+      router.push("/auth/login")
+    }
+  }, [user, isLoading, router])
+
+  useEffect(() => {
+    const fetchFollows = async () => {
       setIsLoading(true)
       try {
-        const url = searchQuery ? `/datasets?search=${encodeURIComponent(searchQuery)}` : "/datasets"
-        const data = await apiClient.get<Dataset[]>(url)
-        setDatasets(data)
+        const data = await apiClient.get<Dataset[]>("/users/me/follows")
+        setFollows(data)
         setError(null)
       } catch (err) {
-        setError("Failed to load datasets. Please try again.")
-        setDatasets([])
+        setError("Failed to load followed datasets. Please try again.")
+        setFollows([])
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchDatasets()
-  }, [searchQuery])
+    if (user) {
+      fetchFollows()
+    }
+  }, [user])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    // The search is already triggered by the useEffect when searchQuery changes
+  const handleUnfollow = async (dataset: Dataset) => {
+    const [owner, name] = dataset.hf_id.split("/")
+    try {
+      await apiClient.delete(`/datasets/${owner}/${name}/follow`)
+      setFollows(follows.filter((d) => d.hf_id !== dataset.hf_id))
+    } catch (err) {
+      setError("Failed to unfollow dataset. Please try again.")
+    }
   }
 
   const formatBytes = (bytes: number | null) => {
@@ -72,30 +82,28 @@ export default function DatasetsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-collinear-darkBlue dark:text-white">Datasets</h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-1">Explore public datasets available on Hugging Face</p>
+          <h1 className="text-3xl font-bold text-collinear-darkBlue dark:text-white">My Followed Datasets</h1>
+          <p className="text-gray-600 dark:text-gray-300 mt-1">Manage the datasets you are following</p>
         </div>
-        <form onSubmit={handleSearch} className="w-full md:w-auto">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-            <Input
-              type="text"
-              placeholder="Search datasets..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-full md:w-[300px] border-gray-300 focus:border-collinear-orange focus:ring-collinear-orange"
-            />
-          </div>
-        </form>
+        <Button
+          onClick={() => router.push("/datasets")}
+          className="bg-collinear-orange hover:bg-collinear-orange/90 text-white"
+        >
+          <Star className="mr-2 h-4 w-4" />
+          Follow More Datasets
+        </Button>
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 p-4 rounded-md mb-6">{error}</div>
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
+          {[...Array(3)].map((_, i) => (
             <div key={i} className="bg-white dark:bg-collinear-navy rounded-lg shadow-md overflow-hidden">
               <div className="p-5">
                 <Skeleton className="h-6 w-3/4 mb-2" />
@@ -113,19 +121,21 @@ export default function DatasetsPage() {
             </div>
           ))}
         </div>
-      ) : datasets.length === 0 ? (
+      ) : follows.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-collinear-navy rounded-lg shadow-md">
-          <Database className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-collinear-darkBlue dark:text-white">No datasets found</h3>
-          <p className="mt-1 text-gray-600 dark:text-gray-300">
-            {searchQuery
-              ? `No results for "${searchQuery}". Try a different search term.`
-              : "There are no datasets available at the moment."}
-          </p>
+          <Star className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-4 text-lg font-medium text-collinear-darkBlue dark:text-white">No followed datasets</h3>
+          <p className="mt-1 text-gray-600 dark:text-gray-300">You are not following any datasets yet.</p>
+          <Button
+            className="mt-4 bg-collinear-orange hover:bg-collinear-orange/90 text-white"
+            onClick={() => router.push("/datasets")}
+          >
+            Browse Datasets
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {datasets.map((dataset) => {
+          {follows.map((dataset) => {
             const [owner, name] = dataset.hf_id.split("/")
             const impact = getImpactLabel(dataset.impact_score)
 
@@ -174,20 +184,15 @@ export default function DatasetsPage() {
                   >
                     View Details
                   </Button>
-                  {user && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        // This would be replaced with actual follow/unfollow logic
-                        alert(`Follow functionality would be implemented here for ${dataset.hf_id}`)
-                      }}
-                      className="text-collinear-darkBlue dark:text-white hover:text-collinear-orange dark:hover:text-collinear-orange"
-                    >
-                      <Star className="h-4 w-4 mr-1" />
-                      Follow
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleUnfollow(dataset)}
+                    className="text-collinear-darkBlue dark:text-white hover:text-collinear-orange dark:hover:text-collinear-orange"
+                  >
+                    <StarOff className="h-4 w-4 mr-1" />
+                    Unfollow
+                  </Button>
                 </div>
               </div>
             )

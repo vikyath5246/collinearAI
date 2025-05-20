@@ -48,7 +48,15 @@ def get_current_user(token: str = Depends(oauth2_scheme),
     )
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
-        uid: int | None = payload.get("sub")
+        sub = payload.get("sub")
+        if sub is None:
+            raise cred_exc
+
+        try:
+            uid = int(sub)
+        except ValueError:
+            raise cred_exc
+
         if uid is None:
             raise cred_exc
     except JWTError:

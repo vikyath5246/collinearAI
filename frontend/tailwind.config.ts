@@ -28,9 +28,6 @@ const config = {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
-          // Collinear orange
-          500: "#ff5c28",
-          600: "#e64a16",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -55,6 +52,14 @@ const config = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        collinear: {
+          orange: "#FF6B35",
+          darkBlue: "#0F1A3A",
+          navy: "#1A2A4A",
+          lightGray: "#F5F5F7",
+          gray: "#E5E5E5",
+          darkGray: "#666666",
         },
       },
       borderRadius: {
